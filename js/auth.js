@@ -52,7 +52,7 @@ function tryAutoSignIn() {
 }
 
 export function signIn() {
-  tokenClient?.requestAccessToken({ prompt: '' });
+  tokenClient?.requestAccessToken({ prompt: 'consent' });
 }
 
 export function signOut() {
