@@ -35,3 +35,4 @@ export const CONFIG = {
     mention_tva: 'TVA non applicable, art. 293 B du CGI',
   },
 };
+
