@@ -12,13 +12,23 @@ export function initAuth(callback) {
 export function setupGoogleAuth() {
   return new Promise((resolve) => {
     const check = setInterval(() => {
-      if (window.google?.accounts?.oauth2) {
+      if (window.google?.accounts?.id && window.google?.accounts?.oauth2) {
         clearInterval(check);
+
         tokenClient = google.accounts.oauth2.initTokenClient({
           client_id: CONFIG.CLIENT_ID,
           scope: CONFIG.SCOPES,
           callback: handleTokenResponse,
         });
+
+        google.accounts.id.initialize({
+          client_id: CONFIG.CLIENT_ID,
+          callback: handleCredentialResponse,
+          auto_select: true,
+          cancel_on_tap_outside: false,
+          use_fedcm_for_prompt: false,
+        });
+
         tryAutoSignIn();
         resolve();
       }
@@ -26,16 +36,25 @@ export function setupGoogleAuth() {
   });
 }
 
+function handleCredentialResponse() {
+  // Après identification One Tap, on récupère le token API silencieusement
+  tokenClient.requestAccessToken({ prompt: '' });
+}
+
 function handleTokenResponse(resp) {
   if (resp.error) {
-    console.error('Auth error:', resp.error);
+    if (resp.error === 'interaction_required' || resp.error === 'consent_required') {
+      // Fallback : popup si le consentement est nécessaire (première fois)
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+      return;
+    }
     onAuthChange?.(false);
     return;
   }
   accessToken = resp.access_token;
   tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
   sessionStorage.setItem('gtoken', accessToken);
-  sessionStorage.setItem('gtoken_expiry', tokenExpiry);
+  sessionStorage.setItem('gtoken_expiry', String(tokenExpiry));
   onAuthChange?.(true);
 }
 
@@ -48,17 +67,30 @@ function tryAutoSignIn() {
     onAuthChange?.(true);
   } else {
     onAuthChange?.(false);
+    // Tente One Tap automatique au chargement
+    google.accounts.id.prompt((notification) => {
+      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        // One Tap non disponible, l'utilisateur devra cliquer
+      }
+    });
   }
 }
 
 export function signIn() {
-  tokenClient?.requestAccessToken({});
+  // Affiche l'overlay One Tap (sur la page, sans nouvel onglet)
+  google.accounts.id.prompt((notification) => {
+    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+      // Fallback si One Tap bloqué (ex: paramètre navigateur)
+      tokenClient.requestAccessToken({ prompt: 'select_account' });
+    }
+  });
 }
 
 export function signOut() {
   if (accessToken) {
     google.accounts.oauth2.revoke(accessToken);
   }
+  google.accounts.id.disableAutoSelect();
   accessToken = null;
   tokenExpiry = 0;
   sessionStorage.removeItem('gtoken');
@@ -68,7 +100,7 @@ export function signOut() {
 
 export function getToken() {
   if (!accessToken || Date.now() >= tokenExpiry) {
-    tokenClient?.requestAccessToken({ prompt: '' });
+    tokenClient.requestAccessToken({ prompt: '' });
     return null;
   }
   return accessToken;
