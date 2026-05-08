@@ -96,7 +96,7 @@ function renderMissionsList(filter) {
               ? `<div class="meta-item"><span>🏭</span> ${entreprises.map(e => escHtml(e.nom)).join(', ')}</div>`
               : ''}
             <div class="meta-item"><span>👥</span> ${m.participants || 0} participant(s)</div>
-            <div class="meta-item"><span>⏱</span> ${heures}h · ${sessions.length} jour(s)</div>
+            <div class="meta-item"><span>⏱</span> ${heures}h · ${sessions.length} jour(s)${m.distanciel ? ' · <span style="color:var(--orange)">🖥 distanciel</span>' : ''}</div>
             ${firstDate ? `<div class="meta-item"><span>📅</span> ${formatDate(firstDate)}${lastDate !== firstDate ? ` → ${formatDate(lastDate)}` : ''}</div>` : ''}
           </div>
           <div class="mission-footer">
@@ -232,13 +232,6 @@ function missionFormHTML(m = {}) {
           ${SPECIALITES.map(s => `<option value="${s.code}" ${m.specialite === s.code ? 'selected' : ''}>${s.code} — ${s.label}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group form-group-full" id="distanciel-group" ${!isFormationType(type) ? 'style="display:none"' : ''}>
-        <label>
-          <input type="checkbox" name="distanciel" value="true" ${m.distanciel ? 'checked' : ''}>
-          Formation en tout ou partie à distance (classe virtuelle, e-learning…)
-        </label>
-      </div>
-
       <div class="form-section-title">Sessions / Jours d'intervention</div>
       <div id="sessions-container" class="form-group-full">
         ${sessions.map((s, i) => sessionRow(s, i)).join('')}
@@ -265,11 +258,17 @@ function sessionRow(s, i) {
         <label>Date</label>
         <input type="date" name="sessions[${i}][date]" value="${s.date || ''}" required>
       </div>
-      <div class="form-group form-group-half" style="max-width:200px">
+      <div class="form-group" style="max-width:160px">
         <label>Heures / jour</label>
         <input type="number" name="sessions[${i}][heures]" value="${s.heures || 7}" min="1" max="12" required>
       </div>
-      <div class="form-group" style="align-self:flex-end;margin-bottom:16px">
+      <div class="form-group" style="justify-content:flex-end;padding-top:22px">
+        <label class="session-distanciel-label">
+          <input type="checkbox" name="sessions[${i}][distanciel]" value="true" ${s.distanciel ? 'checked' : ''}>
+          <span>À distance</span>
+        </label>
+      </div>
+      <div class="form-group" style="align-self:flex-end;margin-bottom:16px;max-width:40px">
         <button type="button" class="btn-icon btn-remove-session" data-idx="${i}" title="Supprimer">🗑️</button>
       </div>
     </div>`;
@@ -293,7 +292,6 @@ function openMissionForm(id = null) {
     document.getElementById('field-entreprises-multi').style.display = anim ? '' : 'none';
     document.getElementById('field-entreprise-single').style.display = anim ? 'none' : '';
     document.getElementById('specialite-group').style.display        = formation ? '' : 'none';
-    document.getElementById('distanciel-group').style.display        = formation ? '' : 'none';
   });
 
   document.getElementById('btn-add-session')?.addEventListener('click', () => {
@@ -329,7 +327,11 @@ async function saveMissionForm(form, id) {
   const sessions = [];
   let i = 0;
   while (fd.has(`sessions[${i}][date]`)) {
-    sessions.push({ date: fd.get(`sessions[${i}][date]`), heures: parseInt(fd.get(`sessions[${i}][heures]`)) || 7 });
+    sessions.push({
+      date: fd.get(`sessions[${i}][date]`),
+      heures: parseInt(fd.get(`sessions[${i}][heures]`)) || 7,
+      distanciel: fd.get(`sessions[${i}][distanciel]`) === 'true',
+    });
     i++;
   }
   sessions.sort((a, b) => a.date.localeCompare(b.date));
@@ -354,7 +356,7 @@ async function saveMissionForm(form, id) {
     tarif_journalier: parseFloat(fd.get('tarif_journalier')) || 0,
     frais_deplacement: parseFloat(fd.get('frais_deplacement')) || 0,
     specialite: isFormationType(type) ? (fd.get('specialite') || '') : '',
-    distanciel: isFormationType(type) ? fd.get('distanciel') === 'true' : false,
+    distanciel: sessions.some(s => s.distanciel),
     notes: fd.get('notes') || '',
     sessions,
   };

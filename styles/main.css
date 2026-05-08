@@ -734,7 +734,30 @@ input[type="checkbox"] {
   border-radius: var(--radius-sm);
   border: 1px solid var(--glass-border);
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
+
+.session-distanciel-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 50px;
+  background: var(--glass-bg);
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.session-distanciel-label:has(input:checked) {
+  background: rgba(27,58,140,0.25);
+  border-color: rgba(27,58,140,0.6);
+  color: var(--white);
+}
+.session-distanciel-label input { display: none; }
 
 .form-actions {
   flex: 1 1 100%;
