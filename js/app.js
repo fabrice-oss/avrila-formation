@@ -97,17 +97,24 @@ function updateThemeIcon(theme) {
 }
 
 function closeSidebar() {
-  document.querySelector('.sidebar')?.classList.remove('open');
+  const sidebar = document.getElementById('sidebar');
+  const toggle  = document.getElementById('sidebar-toggle');
+  sidebar?.classList.remove('open');
   document.getElementById('sidebar-overlay')?.classList.remove('active');
+  toggle?.setAttribute('aria-expanded', 'false');
+  toggle?.setAttribute('aria-label', 'Ouvrir le menu');
 }
 
 function initNavigation() {
   // Hamburger
   document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
-    const sidebar = document.querySelector('.sidebar');
+    const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
-    const isOpen = sidebar.classList.toggle('open');
+    const toggle  = document.getElementById('sidebar-toggle');
+    const isOpen  = sidebar.classList.toggle('open');
     overlay.classList.toggle('active', isOpen);
+    toggle.setAttribute('aria-expanded', String(isOpen));
+    toggle.setAttribute('aria-label', isOpen ? 'Fermer le menu' : 'Ouvrir le menu');
   });
   document.getElementById('sidebar-overlay')?.addEventListener('click', closeSidebar);
 

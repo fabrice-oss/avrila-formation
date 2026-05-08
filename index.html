@@ -14,10 +14,13 @@
 </head>
 <body>
 
-  <!-- Orbes de fond -->
-  <div class="bg-orb bg-orb-1"></div>
-  <div class="bg-orb bg-orb-2"></div>
-  <div class="bg-orb bg-orb-3"></div>
+  <!-- Skip link accessibilité -->
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <!-- Orbes de fond (décoratifs) -->
+  <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
+  <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
+  <div class="bg-orb bg-orb-3" aria-hidden="true"></div>
 
   <!-- Écran de connexion -->
   <div id="login-screen" class="login-screen">
@@ -47,7 +50,7 @@
   <!-- Application principale -->
   <div id="app" class="app hidden">
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar" aria-label="Navigation">
       <div class="sidebar-header">
         <img src="assets/logo.png" alt="Logo" class="sidebar-logo" onerror="this.style.display='none'">
         <div class="sidebar-brand-text">
@@ -56,7 +59,7 @@
         </div>
       </div>
 
-      <nav class="sidebar-nav">
+      <nav class="sidebar-nav" aria-label="Navigation principale">
         <a href="#" class="nav-item active" data-section="dashboard">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
           <span>Tableau de bord</span>
@@ -98,30 +101,30 @@
       </nav>
 
       <div class="sidebar-footer">
-        <button id="signout-btn" class="btn-signout">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <button id="signout-btn" class="btn-signout" aria-label="Se déconnecter">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           Déconnexion
         </button>
       </div>
     </aside>
 
     <!-- Contenu principal -->
-    <main class="main-content">
+    <main class="main-content" id="main-content">
       <header class="top-bar glass-card">
-        <button id="sidebar-toggle" class="btn-hamburger" aria-label="Menu">
-          <span></span><span></span><span></span>
+        <button id="sidebar-toggle" class="btn-hamburger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="sidebar">
+          <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
         </button>
         <h2 id="section-title">Tableau de bord</h2>
         <div class="top-bar-right">
-          <div class="top-bar-year">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <div class="top-bar-year" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             <span id="current-date"></span>
           </div>
-          <button id="theme-toggle" class="btn-theme-toggle" title="Changer de thème"></button>
+          <button id="theme-toggle" class="btn-theme-toggle" title="Changer de thème" aria-label="Changer de thème"></button>
         </div>
       </header>
-      <div id="content-area" class="content-area">
-        <div class="loading-spinner"></div>
+      <div id="content-area" class="content-area" role="region" aria-live="polite" aria-atomic="false">
+        <div class="loading-spinner" role="status" aria-label="Chargement…"></div>
       </div>
       <footer class="app-footer">
         <span>© <span id="footer-year"></span> <strong>AVRILA GESTION</strong></span>
@@ -163,7 +166,7 @@
   </div>
 
   <!-- Toasts -->
-  <div id="toast-container" class="toast-container"></div>
+  <div id="toast-container" class="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <script>
     document.getElementById('current-date').textContent =
