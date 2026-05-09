@@ -177,6 +177,12 @@
   <!-- Toasts -->
   <div id="toast-container" class="toast-container" role="status" aria-live="polite" aria-atomic="true"></div>
 
+  <!-- Save loader -->
+  <div id="save-indicator" class="save-indicator hidden" role="status" aria-live="polite">
+    <div class="save-spinner"></div>
+    <span>Enregistrement…</span>
+  </div>
+
   <script>
     document.getElementById('current-date').textContent =
       new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });

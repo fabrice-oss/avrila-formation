@@ -19,11 +19,9 @@ export function initAuth(callback) {
 }
 
 // ─── Redirect flow (Safari iOS / iPadOS) ─────────────────────────────────────
-// Safari bloque les popups OAuth même avec geste utilisateur.
-// On utilise le flux redirect natif OAuth 2.0 implicit grant.
-// PRÉREQUIS : ajouter l'URI de l'app dans Google Cloud Console >
-//   APIs & Services > Identifiants > OAuth 2.0 > URI de redirection autorisés
-//   → https://avrila.fr/gestion/
+// Safari bloque les popups OAuth. On utilise le flux redirect natif.
+// PRÉREQUIS Google Cloud Console → URI de redirection autorisés :
+//   https://avrila.fr/gestion/
 
 function signInWithRedirect() {
   const redirectUri = window.location.origin + window.location.pathname;
@@ -38,17 +36,13 @@ function signInWithRedirect() {
   window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 }
 
-// Après le redirect, Google ajoute le token dans le fragment d'URL (#access_token=...)
 function consumeRedirectToken() {
   if (!window.location.hash) return false;
   const params = new URLSearchParams(window.location.hash.slice(1));
   const token = params.get('access_token');
   const expiresIn = parseInt(params.get('expires_in') || '0');
   if (!token || !expiresIn) return false;
-
-  // Nettoyer le fragment pour éviter de le rejouer
   history.replaceState(null, '', window.location.pathname + window.location.search);
-
   accessToken = token;
   tokenExpiry = Date.now() + (expiresIn - 60) * 1000;
   localStorage.setItem('gtoken', accessToken);
@@ -57,11 +51,10 @@ function consumeRedirectToken() {
 }
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
-
 export function setupGoogleAuth() {
   return new Promise((resolve) => {
     if (isSafariIOS()) {
-      // Pas de GIS pour Safari iOS — redirect OAuth natif uniquement
+      // Safari : pas de popup GIS, redirect OAuth uniquement
       if (consumeRedirectToken()) {
         onAuthChange?.(true);
       } else {
@@ -71,25 +64,15 @@ export function setupGoogleAuth() {
       return;
     }
 
-    // Flux popup GIS pour Chrome, Firefox, desktop Safari, etc.
+    // Autres navigateurs : popup GIS (pas de One Tap — bouton seul)
     const check = setInterval(() => {
-      if (window.google?.accounts?.id && window.google?.accounts?.oauth2) {
+      if (window.google?.accounts?.oauth2) {
         clearInterval(check);
-
         tokenClient = google.accounts.oauth2.initTokenClient({
           client_id: CONFIG.CLIENT_ID,
           scope: CONFIG.SCOPES,
           callback: handleTokenResponse,
         });
-
-        google.accounts.id.initialize({
-          client_id: CONFIG.CLIENT_ID,
-          callback: handleCredentialResponse,
-          auto_select: true,
-          cancel_on_tap_outside: false,
-          use_fedcm_for_prompt: false,
-        });
-
         tryAutoSignIn();
         resolve();
       }
@@ -97,17 +80,12 @@ export function setupGoogleAuth() {
   });
 }
 
-// iOS BFCache : page restaurée après retour depuis un autre onglet
+// BFCache iOS : page restaurée depuis le cache navigateur
 window.addEventListener('pageshow', (event) => {
   if (event.persisted && onAuthChange) tryAutoSignIn();
 });
 
-// ─── Handlers GIS (non-Safari uniquement) ────────────────────────────────────
-
-function handleCredentialResponse() {
-  tokenClient.requestAccessToken({ prompt: '' });
-}
-
+// ─── Token handler ────────────────────────────────────────────────────────────
 function handleTokenResponse(resp) {
   if (resp.error) {
     if (resp.error === 'interaction_required' || resp.error === 'consent_required') {
@@ -117,7 +95,6 @@ function handleTokenResponse(resp) {
     onAuthChange?.(false);
     return;
   }
-
   accessToken = resp.access_token;
   tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
   localStorage.setItem('gtoken', accessToken);
@@ -125,44 +102,31 @@ function handleTokenResponse(resp) {
   onAuthChange?.(true);
 }
 
-// ─── Cache token ──────────────────────────────────────────────────────────────
-
+// ─── Cache localStorage ───────────────────────────────────────────────────────
 function tryAutoSignIn() {
   const saved  = localStorage.getItem('gtoken');
   const expiry = parseInt(localStorage.getItem('gtoken_expiry') || '0');
-
   if (saved && Date.now() < expiry) {
     accessToken = saved;
     tokenExpiry = expiry;
     onAuthChange?.(true);
     return;
   }
-
   onAuthChange?.(false);
-
-  if (!isSafariIOS()) {
-    google.accounts.id.prompt(() => {});
-  }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
-
 export function signIn() {
   if (isSafariIOS()) {
     signInWithRedirect();
     return;
   }
-
-  google.accounts.id.prompt((notification) => {
-    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-      tokenClient.requestAccessToken({ prompt: 'select_account' });
-    }
-  });
+  // Popup directe — pas de One Tap (inutile quand on a un bouton dédié)
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
 }
 
 export function signOut() {
   try { if (accessToken && !isSafariIOS()) google.accounts.oauth2.revoke(accessToken); } catch (_) {}
-  try { if (!isSafariIOS()) google.accounts.id.disableAutoSelect(); } catch (_) {}
   accessToken = null;
   tokenExpiry = 0;
   localStorage.removeItem('gtoken');

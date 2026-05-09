@@ -4,8 +4,20 @@ import { uuid, toast, formatCurrency, isoToday } from '../utils.js';
 const BNC_TYPES = ['animation', 'conception'];
 const BIC_TYPES = ['creation_site_web', 'application_web', 'gestion_site_web'];
 
+// Formatage local pour éviter le décalage UTC (bug timezone)
 function lastDayOfMonth(year, month) {
-  return new Date(year, month + 1, 0).toISOString().split('T')[0];
+  const d = new Date(year, month + 1, 0);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Prélèvement URSSAF = le 5 du mois suivant l'échéance
+function debitDate(deadlineIso) {
+  const d = new Date(deadlineIso + 'T12:00:00');
+  const m = d.getMonth();
+  const y = d.getFullYear();
+  const debitM = (m + 1) % 12;
+  const debitY = m === 11 ? y + 1 : y;
+  return `${debitY}-${String(debitM + 1).padStart(2, '0')}-05`;
 }
 
 function buildPeriods(year, freq) {
@@ -21,6 +33,7 @@ function buildPeriods(year, freq) {
         id: `${year}-M${String(m + 1).padStart(2, '0')}`,
         label: new Date(year, m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
         start, end, deadline,
+        debit: debitDate(deadline),
       });
     }
   } else {
@@ -35,6 +48,7 @@ function buildPeriods(year, freq) {
         id: `${year}-T${q + 1}`,
         label: `T${q + 1} ${year}`,
         start, end, deadline,
+        debit: debitDate(deadline),
       });
     }
   }
@@ -53,13 +67,13 @@ function splitCAByType(start, end) {
     const type = mission?.type || '';
     if (BNC_TYPES.includes(type)) caBNC += f.montant_ht || 0;
     else if (BIC_TYPES.includes(type)) caBIC += f.montant_ht || 0;
-    else caBNC += f.montant_ht || 0; // default to BNC if unknown
+    else caBNC += f.montant_ht || 0;
   });
   return { caBNC, caBIC };
 }
 
 function daysUntil(isoDate) {
-  const diff = new Date(isoDate) - new Date(isoToday());
+  const diff = new Date(isoDate + 'T12:00:00') - new Date(isoToday() + 'T12:00:00');
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
@@ -74,8 +88,15 @@ function calcCotisations(caBNC, caBIC, settings) {
   const cotBNC     = caBNC  * tauxBNC     / 100;
   const cotFormPro = caBNC  * tauxFormPro / 100;
   const total      = cotBIC + cotVentes + cotBNC + cotFormPro;
+  // Arrondi au centime supérieur (ex: 712,08 → 713)
+  const totalArrondi = Math.ceil(total);
 
-  return { tauxBNC, tauxBIC, tauxVentes, tauxFormPro, cotBIC, cotVentes, cotBNC, cotFormPro, total };
+  return { tauxBNC, tauxBIC, tauxVentes, tauxFormPro, cotBIC, cotVentes, cotBNC, cotFormPro, total, totalArrondi };
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 export function render() {
@@ -88,7 +109,6 @@ export function render() {
       <h2>Déclarations URSSAF</h2>
     </div>
 
-    <!-- Paramètres -->
     <div class="glass-card urssaf-settings-card">
       <h3 style="margin-bottom:16px;font-size:0.95rem;font-weight:600">Paramètres de déclaration</h3>
       <div class="form-grid" style="gap:16px">
@@ -117,7 +137,6 @@ export function render() {
       </div>
     </div>
 
-    <!-- Sélecteur d'année -->
     <div class="bpf-year-selector glass-card">
       <label>Exercice :</label>
       <select id="urssaf-year">
@@ -146,14 +165,13 @@ function renderDeclarations(year, freq) {
     const isOverdue = !declaration && jours < 0;
     const isFuture  = period.start > today;
 
-    // Valeurs affichées (déclarée ou calculée)
-    const dispBNC     = declaration?.ca_bnc     ?? caBNC;
-    const dispBIC     = declaration?.ca_bic     ?? caBIC;
-    const dispCotis   = declaration ? calcCotisations(dispBNC, dispBIC, settings) : cotis;
+    const dispBNC   = declaration?.ca_bnc ?? caBNC;
+    const dispBIC   = declaration?.ca_bic ?? caBIC;
+    const dispCotis = declaration ? calcCotisations(dispBNC, dispBIC, settings) : cotis;
 
     let statusBadge = '';
     if (declaration) {
-      statusBadge = `<span class="badge badge-success">✓ Déclarée le ${new Date(declaration.date_declaration).toLocaleDateString('fr-FR')}</span>`;
+      statusBadge = `<span class="badge badge-success">✓ Déclarée le ${new Date(declaration.date_declaration + 'T12:00:00').toLocaleDateString('fr-FR')}</span>`;
     } else if (isOverdue) {
       statusBadge = `<span class="badge badge-danger">⚠️ En retard (${Math.abs(jours)} j)</span>`;
     } else if (isUrgent) {
@@ -181,39 +199,21 @@ function renderDeclarations(year, freq) {
 
     const declareZone = !isFuture ? `
       <div class="urssaf-declare-form" id="declare-zone-${period.id}">
-        <!-- Saisie CA -->
         <div class="urssaf-ca-inputs">
           <div class="form-group" style="margin:0;flex:1;min-width:160px">
-            <label style="font-size:0.78rem">
-              CA BNC — Formations (€)
-              <span class="urssaf-auto-badge">● auto</span>
-            </label>
-            <input type="number"
-              class="urssaf-ca-input"
-              id="ca-bnc-${period.id}"
-              data-type="bnc"
-              data-period-id="${period.id}"
-              value="${dispBNC.toFixed(2)}"
-              min="0" step="0.01"
-              ${declaration ? 'disabled' : ''}>
+            <label style="font-size:0.78rem">CA BNC — Formations (€) <span class="urssaf-auto-badge">● auto</span></label>
+            <input type="number" class="urssaf-ca-input" id="ca-bnc-${period.id}"
+              data-type="bnc" data-period-id="${period.id}"
+              value="${dispBNC.toFixed(2)}" min="0" step="0.01" ${declaration ? 'disabled' : ''}>
           </div>
           <div class="form-group" style="margin:0;flex:1;min-width:160px">
-            <label style="font-size:0.78rem">
-              CA BIC — Services web (€)
-              <span class="urssaf-auto-badge">● auto</span>
-            </label>
-            <input type="number"
-              class="urssaf-ca-input"
-              id="ca-bic-${period.id}"
-              data-type="bic"
-              data-period-id="${period.id}"
-              value="${dispBIC.toFixed(2)}"
-              min="0" step="0.01"
-              ${declaration ? 'disabled' : ''}>
+            <label style="font-size:0.78rem">CA BIC — Services web (€) <span class="urssaf-auto-badge">● auto</span></label>
+            <input type="number" class="urssaf-ca-input" id="ca-bic-${period.id}"
+              data-type="bic" data-period-id="${period.id}"
+              value="${dispBIC.toFixed(2)}" min="0" step="0.01" ${declaration ? 'disabled' : ''}>
           </div>
         </div>
 
-        <!-- Tableau des 4 lignes URSSAF -->
         <div class="urssaf-cotis-table" id="cotis-table-${period.id}">
           ${renderCotisTable(dispCotis, period.id)}
         </div>
@@ -224,21 +224,19 @@ function renderDeclarations(year, freq) {
           ${declaration ? `
             <button class="btn-secondary btn-sm btn-edit-declare"
               data-id="${declaration.id}"
-              data-period='${JSON.stringify(period)}'>
-              ✏️ Modifier
-            </button>
+              data-period='${JSON.stringify(period)}'>✏️ Modifier</button>
             <button class="btn-secondary btn-sm btn-undo-declare"
-              data-id="${declaration.id}">
-              Annuler la déclaration
-            </button>
+              data-id="${declaration.id}">Annuler la déclaration</button>
           ` : `
+            <div class="form-group" style="margin:0;flex:1;min-width:140px">
+              <label style="font-size:0.78rem">Date de déclaration réelle</label>
+              <input type="date" id="declare-date-${period.id}" value="${isoToday()}">
+            </div>
             <button class="btn-primary btn-sm btn-declare"
-              data-period='${JSON.stringify(period)}'>
-              Enregistrer la déclaration
-            </button>
+              data-period='${JSON.stringify(period)}'>Enregistrer la déclaration</button>
           `}
         </div>
-      </div>` : `<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">Période à venir — aucune déclaration à faire pour l'instant.</div>`;
+      </div>` : `<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0">Période à venir — aucune déclaration à faire.</div>`;
 
     return `
       <div class="urssaf-period-card glass-card ${isUrgent ? 'urssaf-urgent' : ''} ${isOverdue ? 'urssaf-overdue' : ''} ${declaration ? 'urssaf-done' : ''}">
@@ -247,8 +245,9 @@ function renderDeclarations(year, freq) {
             <span class="urssaf-period-label">${period.label}</span>
             ${statusBadge}
           </div>
-          <div class="urssaf-period-deadline">
-            Échéance : ${new Date(period.deadline).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+          <div class="urssaf-period-dates">
+            <div class="urssaf-period-deadline">📅 Échéance : ${fmtDate(period.deadline)}</div>
+            <div class="urssaf-period-debit">🏦 Prélèvement URSSAF : 5 ${new Date(period.debit + 'T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</div>
           </div>
         </div>
         ${declareZone}
@@ -270,15 +269,9 @@ function renderDeclarations(year, freq) {
 
     <div class="urssaf-total glass-card">
       <h4 style="margin-bottom:12px;font-size:0.9rem;font-weight:600;opacity:0.7">Récapitulatif ${year}</h4>
-      <div class="urssaf-total-row">
-        <span>CA BNC (formations)</span>
-        <strong>${formatCurrency(totalBNC)}</strong>
-      </div>
-      <div class="urssaf-total-row">
-        <span>CA BIC (services web)</span>
-        <strong>${formatCurrency(totalBIC)}</strong>
-      </div>
-      <div class="urssaf-total-row" style="border-top:1px solid var(--border-color);margin-top:8px;padding-top:8px">
+      <div class="urssaf-total-row"><span>CA BNC (formations)</span><strong>${formatCurrency(totalBNC)}</strong></div>
+      <div class="urssaf-total-row"><span>CA BIC (services web)</span><strong>${formatCurrency(totalBIC)}</strong></div>
+      <div class="urssaf-total-row" style="border-top:1px solid var(--glass-border);margin-top:8px;padding-top:8px">
         <span>Cotisations BIC services (${totalCotis.tauxBIC}%)</span>
         <strong class="text-orange">${formatCurrency(totalCotis.cotBIC)}</strong>
       </div>
@@ -290,9 +283,9 @@ function renderDeclarations(year, freq) {
         <span>Formation prof. obligatoire (${totalCotis.tauxFormPro}%)</span>
         <strong class="text-orange">${formatCurrency(totalCotis.cotFormPro)}</strong>
       </div>
-      <div class="urssaf-total-row" style="border-top:1px solid var(--border-color);margin-top:8px;padding-top:8px;font-size:1rem">
-        <span><strong>TOTAL COTISATIONS</strong></span>
-        <strong class="text-orange" style="font-size:1.1rem">${formatCurrency(totalCotis.total)}</strong>
+      <div class="urssaf-total-row" style="border-top:1px solid var(--glass-border);margin-top:8px;padding-top:8px;font-size:1rem">
+        <span><strong>TOTAL COTISATIONS (arrondi €)</strong></span>
+        <strong class="text-orange" style="font-size:1.1rem">${totalCotis.totalArrondi} €</strong>
       </div>
       <div class="urssaf-total-row" style="margin-top:8px">
         <span>Périodes déclarées / Total</span>
@@ -335,8 +328,8 @@ function renderCotisTable(cotis, periodId) {
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="2"><strong>TOTAL</strong></td>
-          <td id="cotis-total-${periodId}"><strong>${formatCurrency(cotis.total)}</strong></td>
+          <td colspan="2"><strong>TOTAL (arrondi au € supérieur)</strong></td>
+          <td id="cotis-total-${periodId}"><strong>${cotis.totalArrondi} €</strong></td>
         </tr>
       </tfoot>
     </table>`;
@@ -348,14 +341,13 @@ export function init() {
     store.settings.urssaf_taux_bnc         = parseFloat(document.getElementById('urssaf-taux-bnc').value) || 25.60;
     store.settings.urssaf_taux_bic_services= parseFloat(document.getElementById('urssaf-taux-bic-services').value) || 21.20;
     store.settings.urssaf_taux_formation_pro= parseFloat(document.getElementById('urssaf-taux-formation-pro').value) || 0.20;
-    store.settings.urssaf_taux = store.settings.urssaf_taux_bnc; // compat
+    store.settings.urssaf_taux = store.settings.urssaf_taux_bnc;
     await saveSettings();
     toast('Paramètres URSSAF enregistrés ✓');
     refreshContent();
   });
 
   document.getElementById('btn-calc-urssaf')?.addEventListener('click', refreshContent);
-
   attachDeclareEvents();
 }
 
@@ -370,12 +362,11 @@ function updateCotisDisplay(periodId) {
   const caBNC = parseFloat(document.getElementById(`ca-bnc-${periodId}`)?.value) || 0;
   const caBIC = parseFloat(document.getElementById(`ca-bic-${periodId}`)?.value) || 0;
   const cotis = calcCotisations(caBNC, caBIC, store.settings);
-
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   set(`cotis-bic-${periodId}`,   formatCurrency(cotis.cotBIC));
   set(`cotis-bnc-${periodId}`,   formatCurrency(cotis.cotBNC));
   set(`cotis-fpo-${periodId}`,   formatCurrency(cotis.cotFormPro));
-  set(`cotis-total-${periodId}`, formatCurrency(cotis.total));
+  set(`cotis-total-${periodId}`, `${cotis.totalArrondi} €`);
 }
 
 function attachDeclareEvents() {
@@ -389,6 +380,7 @@ function attachDeclareEvents() {
       const caBNC = parseFloat(document.getElementById(`ca-bnc-${period.id}`)?.value) || 0;
       const caBIC = parseFloat(document.getElementById(`ca-bic-${period.id}`)?.value) || 0;
       const cotis = calcCotisations(caBNC, caBIC, store.settings);
+      const declareDate = document.getElementById(`declare-date-${period.id}`)?.value || isoToday();
 
       store.declarations_urssaf.push({
         id: uuid(),
@@ -397,9 +389,9 @@ function attachDeclareEvents() {
         ca_bnc: caBNC,
         ca_bic: caBIC,
         ca_declare: caBNC + caBIC,
-        cotisations: cotis.total,
+        cotisations: cotis.totalArrondi,
         cotisations_detail: { cotBIC: cotis.cotBIC, cotBNC: cotis.cotBNC, cotFormPro: cotis.cotFormPro },
-        date_declaration: isoToday(),
+        date_declaration: declareDate,
         created_at: new Date().toISOString(),
       });
       await saveDeclarationsUrssaf();
@@ -412,6 +404,7 @@ function attachDeclareEvents() {
     btn.addEventListener('click', () => {
       const period = JSON.parse(btn.dataset.period);
       const declarationId = btn.dataset.id;
+      const declaration = store.declarations_urssaf.find(d => d.id === declarationId);
 
       document.getElementById(`ca-bnc-${period.id}`).disabled = false;
       document.getElementById(`ca-bic-${period.id}`).disabled = false;
@@ -419,11 +412,13 @@ function attachDeclareEvents() {
       const actions = btn.closest('.urssaf-declare-actions');
       if (actions) {
         actions.innerHTML = `
+          <div class="form-group" style="margin:0;flex:1;min-width:140px">
+            <label style="font-size:0.78rem">Date de déclaration réelle</label>
+            <input type="date" id="declare-date-${period.id}" value="${declaration?.date_declaration || isoToday()}">
+          </div>
           <button class="btn-primary btn-sm btn-save-edit"
             data-id="${declarationId}"
-            data-period='${JSON.stringify(period)}'>
-            Enregistrer la déclaration
-          </button>
+            data-period='${JSON.stringify(period)}'>Enregistrer</button>
           <button class="btn-secondary btn-sm btn-cancel-edit">Annuler</button>`;
         attachEditSaveEvents();
       }
@@ -448,6 +443,7 @@ function attachEditSaveEvents() {
       const caBNC = parseFloat(document.getElementById(`ca-bnc-${period.id}`)?.value) || 0;
       const caBIC = parseFloat(document.getElementById(`ca-bic-${period.id}`)?.value) || 0;
       const cotis = calcCotisations(caBNC, caBIC, store.settings);
+      const declareDate = document.getElementById(`declare-date-${period.id}`)?.value || isoToday();
 
       const idx = store.declarations_urssaf.findIndex(d => d.id === declarationId);
       if (idx !== -1) {
@@ -456,9 +452,9 @@ function attachEditSaveEvents() {
           ca_bnc: caBNC,
           ca_bic: caBIC,
           ca_declare: caBNC + caBIC,
-          cotisations: cotis.total,
+          cotisations: cotis.totalArrondi,
           cotisations_detail: { cotBIC: cotis.cotBIC, cotBNC: cotis.cotBNC, cotFormPro: cotis.cotFormPro },
-          date_declaration: isoToday(),
+          date_declaration: declareDate,
         };
       }
       await saveDeclarationsUrssaf();

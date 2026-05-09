@@ -44,12 +44,34 @@ export async function initData() {
   store._loaded = true;
 }
 
-export async function saveSettings() { await saveJSON('settings', store.settings); }
-export async function saveOrganismes() { await saveJSON('organismes', store.organismes); }
-export async function saveEntreprises() { await saveJSON('entreprises', store.entreprises); }
-export async function saveMissions() { await saveJSON('missions', store.missions); }
-export async function saveFactures() { await saveJSON('factures', store.factures); }
-export async function saveDeclarationsUrssaf() { await saveJSON('declarations_urssaf', store.declarations_urssaf); }
+function showSave(msg = 'Enregistrement…') {
+  const el = document.getElementById('save-indicator');
+  if (!el) return;
+  el.querySelector('span').textContent = msg;
+  el.classList.remove('hidden');
+}
+function hideSave() {
+  document.getElementById('save-indicator')?.classList.add('hidden');
+}
+
+export async function saveSettings() {
+  showSave(); try { await saveJSON('settings', store.settings); } finally { hideSave(); }
+}
+export async function saveOrganismes() {
+  showSave(); try { await saveJSON('organismes', store.organismes); } finally { hideSave(); }
+}
+export async function saveEntreprises() {
+  showSave(); try { await saveJSON('entreprises', store.entreprises); } finally { hideSave(); }
+}
+export async function saveMissions() {
+  showSave(); try { await saveJSON('missions', store.missions); } finally { hideSave(); }
+}
+export async function saveFactures() {
+  showSave(); try { await saveJSON('factures', store.factures); } finally { hideSave(); }
+}
+export async function saveDeclarationsUrssaf() {
+  showSave(); try { await saveJSON('declarations_urssaf', store.declarations_urssaf); } finally { hideSave(); }
+}
 
 export async function autosave(key) {
   try {

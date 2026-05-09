@@ -39,7 +39,7 @@ function renderFacturesList(filter) {
       <div class="table-wrapper">
       <table class="data-table">
         <thead><tr>
-          <th>N° Facture</th><th>Date</th><th>Organisme</th><th>Mission</th><th>Montant HT</th><th>Échéance</th><th>Statut</th><th>Actions</th>
+          <th>N° Facture</th><th>Date</th><th>Organisme</th><th>Mission</th><th>Montant HT</th><th>Échéance</th><th>Statut</th><th>Payée le</th><th>Actions</th>
         </tr></thead>
         <tbody>
           ${sorted.map(f => {
@@ -59,6 +59,7 @@ function renderFacturesList(filter) {
                     ${f.statut === 'payee' ? 'Payée' : retard ? '⚠️ En retard' : 'En attente'}
                   </span>
                 </td>
+                <td>${f.statut === 'payee' && f.date_paiement ? formatDate(f.date_paiement) : '—'}</td>
                 <td class="actions">
                   <button class="btn-icon btn-pdf" data-id="${f.id}" title="Générer et télécharger le PDF">📄</button>
                   <button class="btn-icon btn-edit-facture" data-id="${f.id}" title="Modifier la facture">✏️</button>
@@ -142,6 +143,10 @@ function factureFormHTML(missionId = null) {
         <label>Échéance</label>
         <input type="date" name="date_echeance" value="${echeance}" required>
       </div>
+      <div class="form-group form-group-full">
+        <label>Référence formation / ID PIPE <span style="font-weight:400;color:var(--text-muted)">(optionnel — ex: PIPE-2026-042 ou REF-CSE-0312)</span></label>
+        <input type="text" name="reference_formation" placeholder="Laisser vide si non applicable">
+      </div>
       <div class="form-actions">
         <button type="button" class="btn-secondary" id="btn-cancel">Annuler</button>
         <button type="submit" class="btn-primary">Créer la facture</button>
@@ -179,6 +184,10 @@ function editFactureFormHTML(facture) {
         <label>Date de paiement</label>
         <input type="date" name="date_paiement" value="${facture.date_paiement || isoToday()}">
       </div>
+      <div class="form-group form-group-full">
+        <label>Référence formation / ID PIPE <span style="font-weight:400;color:var(--text-muted)">(optionnel)</span></label>
+        <input type="text" name="reference_formation" value="${escHtml(facture.reference_formation || '')}" placeholder="Ex: PIPE-2026-042 ou REF-CSE-0312">
+      </div>
       <div class="form-actions">
         <button type="button" class="btn-secondary" id="btn-cancel">Annuler</button>
         <button type="submit" class="btn-primary">Enregistrer les modifications</button>
@@ -208,6 +217,7 @@ function openFactureForm(id = null, missionId = null) {
       montant_ht: parseFloat(fd.get('montant_ht')) || 0,
       statut: 'en_attente',
       date_paiement: null,
+      reference_formation: fd.get('reference_formation') || null,
       pdf_drive_id: null,
       created_at: new Date().toISOString(),
     };
@@ -245,6 +255,7 @@ function openEditFactureForm(id) {
       montant_ht: parseFloat(fd.get('montant_ht')) || 0,
       statut: newStatut,
       date_paiement: newStatut === 'payee' ? (fd.get('date_paiement') || isoToday()) : null,
+      reference_formation: fd.get('reference_formation') || store.factures[idx].reference_formation || null,
     };
     await saveFactures();
     toast('Facture modifiée ✓');
@@ -286,15 +297,33 @@ async function downloadPDF(id) {
   }
 }
 
-async function markPaid(id) {
-  const ok = await confirm('Marquer cette facture comme payée ?');
-  if (!ok) return;
-  const idx = store.factures.findIndex(f => f.id === id);
-  store.factures[idx].statut = 'payee';
-  store.factures[idx].date_paiement = isoToday();
-  await saveFactures();
-  toast('Facture marquée comme payée ✓');
-  navigate('factures');
+function markPaid(id) {
+  const facture = store.factures.find(f => f.id === id);
+  if (!facture) return;
+  showModal('Marquer comme payée', `
+    <div class="form-grid">
+      <div class="form-group form-group-full">
+        <p style="color:var(--text-secondary);margin-bottom:16px">Facture <strong>${escHtml(facture.numero)}</strong></p>
+        <label>Date de paiement reçu</label>
+        <input type="date" id="paid-date-input" value="${isoToday()}">
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" id="btn-cancel-paid">Annuler</button>
+        <button type="button" class="btn-primary" id="btn-confirm-paid">Confirmer le paiement</button>
+      </div>
+    </div>
+  `, 'modal-sm');
+  document.getElementById('btn-cancel-paid')?.addEventListener('click', closeModal);
+  document.getElementById('btn-confirm-paid')?.addEventListener('click', async () => {
+    const datePaid = document.getElementById('paid-date-input').value || isoToday();
+    const idx = store.factures.findIndex(f => f.id === id);
+    store.factures[idx].statut = 'payee';
+    store.factures[idx].date_paiement = datePaid;
+    await saveFactures();
+    toast('Facture marquée comme payée ✓');
+    closeModal();
+    navigate('factures');
+  });
 }
 
 async function deleteFacture(id) {

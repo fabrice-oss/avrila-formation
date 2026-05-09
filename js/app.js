@@ -50,6 +50,15 @@ export async function navigate(section, params = {}) {
   }
 }
 
+// ── Save loader ───────────────────────────────────────────────────────────────
+export function showSaveLoader(msg = 'Enregistrement…') {
+  const el = document.getElementById('save-indicator');
+  if (el) { el.querySelector('span').textContent = msg; el.classList.remove('hidden'); }
+}
+export function hideSaveLoader() {
+  document.getElementById('save-indicator')?.classList.add('hidden');
+}
+
 export function showModal(title, body, extraClass = '') {
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-body').innerHTML = body;
