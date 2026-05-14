@@ -294,8 +294,8 @@ body::before {
 .sidebar-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 24px 20px 20px;
+  gap: 4px;
+  padding: 8px 16px 8px;
   border-bottom: 1px solid var(--glass-border);
 }
 
@@ -306,6 +306,47 @@ body::before {
   flex-shrink: 0;
   border-radius: 50%;
 }
+
+/* ── Orbites sidebar (version miniature) ────── */
+.sidebar-orbit-wrap {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-orbit-wrap .sidebar-logo {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+/* Anneaux réduits */
+.orbit-ring-sm-1 {
+  width: 68px; height: 68px;
+  border-color: rgba(245,166,35,0.22);
+  animation: orbit-cw 4.5s linear infinite;
+}
+.orbit-ring-sm-2 {
+  width: 88px; height: 88px;
+  border-color: rgba(99,179,237,0.18);
+  animation: orbit-cw 8s linear infinite;
+  animation-delay: -2s;
+}
+.orbit-ring-sm-3 {
+  width: 108px; height: 108px;
+  border-color: rgba(159,122,234,0.15);
+  animation: orbit-ccw 13s linear infinite;
+  animation-delay: -5s;
+}
+
+/* Planètes réduites */
+.sidebar-orbit-wrap .orbit-planet-1 { width: 6px; height: 6px; }
+.sidebar-orbit-wrap .orbit-planet-2 { width: 5px; height: 5px; }
+.sidebar-orbit-wrap .orbit-planet-3 { width: 4px; height: 4px; }
 
 .sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.1; }
 .sidebar-brand { font-weight: 800; font-size: 0.95rem; letter-spacing: 0.04em; color: var(--white); }
