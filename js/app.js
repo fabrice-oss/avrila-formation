@@ -90,19 +90,52 @@ async function onAuthChange(authenticated) {
   }
 }
 
-function initTheme() {
-  const saved = localStorage.getItem('theme') || 'dark';
-  document.body.dataset.theme = saved;
-  updateThemeIcon(saved);
+const THEME_CYCLE = ['auto', 'dark', 'light'];
+
+const THEME_ICONS = {
+  auto:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20" stroke-dasharray="3 3"/><path d="M12 2a10 10 0 010 20V2z" fill="currentColor" stroke="none" opacity=".25"/></svg>`,
+  dark:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>`,
+  light: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`,
+};
+
+const THEME_LABELS = {
+  auto:  'Thème automatique (système)',
+  dark:  'Passer en mode clair',
+  light: 'Passer en mode automatique',
+};
+
+let systemThemeWatcher = null;
+
+function applyTheme(pref) {
+  // pref = 'auto' | 'dark' | 'light'
+  if (pref === 'auto') {
+    const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.body.dataset.theme = sysDark ? 'dark' : 'light';
+  } else {
+    document.body.dataset.theme = pref;
+  }
 }
 
-function updateThemeIcon(theme) {
+function initTheme() {
+  const saved = localStorage.getItem('theme-pref') || 'auto';
+  applyTheme(saved);
+  updateThemeIcon(saved);
+
+  // Écoute les changements système si le mode auto est actif
+  systemThemeWatcher = window.matchMedia('(prefers-color-scheme: dark)');
+  systemThemeWatcher.addEventListener('change', () => {
+    if ((localStorage.getItem('theme-pref') || 'auto') === 'auto') {
+      applyTheme('auto');
+    }
+  });
+}
+
+function updateThemeIcon(pref) {
   const btn = document.getElementById('theme-toggle');
   if (!btn) return;
-  btn.title = theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre';
-  btn.innerHTML = theme === 'dark'
-    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
-    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>`;
+  btn.title = THEME_LABELS[pref] || 'Changer de thème';
+  btn.innerHTML = THEME_ICONS[pref] || THEME_ICONS.auto;
+  btn.dataset.themePref = pref;
 }
 
 function closeSidebar() {
@@ -149,11 +182,19 @@ function initNavigation() {
   });
 
   document.getElementById('theme-toggle')?.addEventListener('click', () => {
-    const current = document.body.dataset.theme || 'dark';
-    const next = current === 'dark' ? 'light' : 'dark';
-    document.body.dataset.theme = next;
-    localStorage.setItem('theme', next);
+    const current = localStorage.getItem('theme-pref') || 'auto';
+    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length];
+    localStorage.setItem('theme-pref', next);
+    applyTheme(next);
     updateThemeIcon(next);
+    // Feedback visuel
+    const labels = { auto: '🖥️ Automatique', dark: '🌙 Sombre', light: '☀️ Clair' };
+    const btn = document.getElementById('theme-toggle');
+    const tip = document.createElement('div');
+    tip.className = 'theme-toast';
+    tip.textContent = labels[next];
+    btn.parentElement.appendChild(tip);
+    setTimeout(() => tip.remove(), 1800);
   });
 }
 

@@ -349,7 +349,7 @@ body::before {
   text-overflow: ellipsis;
 }
 
-.top-bar-right { display: flex; align-items: center; gap: 16px; }
+.top-bar-right { display: flex; align-items: center; gap: 16px; position: relative; }
 
 .top-bar-year {
   display: flex;
@@ -1541,6 +1541,27 @@ body[data-theme="light"] .btn-signout:hover { background: rgba(220,53,69,0.08); 
   flex-shrink: 0;
 }
 .btn-theme-toggle:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
+
+/* Tooltip thème */
+.theme-toast {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--navy);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fade-up 0.15s ease, fade-out 0.3s ease 1.5s forwards;
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+}
+@keyframes fade-out {
+  to { opacity: 0; transform: translateY(-4px); }
+}
 
 /* ── Multi-sélection entreprises ────────────── */
 .entreprises-checkboxes {
