@@ -1064,18 +1064,18 @@ input[type="checkbox"] {
   -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--glass-border);
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   letter-spacing: 0.01em;
 }
-.app-footer strong { color: var(--text-secondary); font-weight: 600; }
-.footer-sep { color: var(--glass-border-strong); }
+.app-footer strong { color: var(--text-primary); font-weight: 600; }
+.footer-sep { color: rgba(255,255,255,0.3); }
 .footer-creator-link {
-  color: var(--orange);
+  color: #f5b83d;
   text-decoration: none;
-  font-weight: 500;
-  transition: opacity 0.2s;
+  font-weight: 600;
+  transition: color 0.2s;
 }
-.footer-creator-link:hover { opacity: 0.8; text-decoration: underline; }
+.footer-creator-link:hover { color: #ffd07a; text-decoration: underline; }
 .footer-brand {
   font-weight: 700;
   font-size: 0.72rem;
